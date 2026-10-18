@@ -10,6 +10,10 @@
 #include <string.h>
 #include <riscv.h>
 #include <dtb.h>
+/**cs修改部分*/
+#include <slub.h>
+
+
 
 // virtual address of physical page array
 struct Page *pages;
@@ -34,7 +38,16 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
+   // pmm_manager = &best_fit_pmm_manager;
+  //  cprintf("memory management: %s\n", pmm_manager->name);
+  //  pmm_manager->init();
+   /*cs修改部分*/
+    #ifdef PMM_USE_BUDDY
+    pmm_manager = &buddy_pmm_manager;
+    #else
     pmm_manager = &best_fit_pmm_manager;
+    #endif
+    /*cs修改部分结束*/
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -62,6 +75,45 @@ size_t nr_free_pages(void) {
 }
 
 //lab2 function1 YOUR CODE
+
+// static void page_init(void) {
+//     extern char end[];
+
+//     uint64_t mem_base = get_memory_base();
+//     uint64_t mem_size = get_memory_size();
+//     uint64_t mem_end = mem_base + mem_size;
+
+
+//     assert(mem_base == DRAM_BASE && mem_size > 0 && mem_end > mem_base);
+//     assert(mem_end <= DRAM_BASE + (1UL << 30));
+
+//     va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+
+//     npage = PPN(mem_end);
+
+//     pages = (struct Page *)ROUNDUP((uintptr_t)end, PGSIZE);
+
+//     size_t descriptor_bytes = (npage - nbase) * sizeof(struct Page);
+//     uintptr_t pages_pa = PADDR(pages);
+
+//     assert(pages_pa < mem_end &&
+//            descriptor_bytes <= mem_end - pages_pa);
+
+//     uintptr_t free_begin =
+//         ROUNDUP(pages_pa + descriptor_bytes, PGSIZE);
+//     uintptr_t free_end = ROUNDDOWN(mem_end, PGSIZE);
+
+//     for (size_t i = 0; i < npage - nbase; i++) {
+//         pages[i].flags = pages[i].property = 0;
+//         set_page_ref(&pages[i], 0);
+//         SetPageReserved(&pages[i]);
+//     }
+
+//     if (free_begin < free_end) {
+//         init_memmap(pa2page(free_begin),
+//                     (free_end - free_begin) / PGSIZE);
+//     }
+// }
 // page_init - 根据设备树探测物理内存并初始化 Page 描述符数组，
 // 然后将空闲页区域注册到当前的 pmm_manager。
 static void page_init(void) {
@@ -132,6 +184,14 @@ void pmm_init(void) {
 
     // use pmm->check to verify the correctness of the alloc/free function in a pmm
     check_alloc_page();
+
+     /* cs修改部分 开始：初始化 SLUB，可按编译开关运行自检 */
+    slub_init();
+#ifdef SLUB_SELFTEST
+    slub_check();
+    cprintf("slub_check() succeeded!\n");
+#endif
+    /* cs修改部分 结束 */
 
     extern char boot_page_table_sv39[];
     satp_virtual = (pte_t*)boot_page_table_sv39;
