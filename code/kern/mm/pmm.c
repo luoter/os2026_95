@@ -34,7 +34,7 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    pmm_manager = &default_pmm_manager;
+    pmm_manager = &best_fit_pmm_manager;
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -62,6 +62,60 @@ size_t nr_free_pages(void) {
 }
 
 //lab2 function1 YOUR CODE
+// page_init - 根据设备树探测物理内存并初始化 Page 描述符数组，
+// 然后将空闲页区域注册到当前的 pmm_manager。
+static void page_init(void) {
+    // 1. 设置 PADDR / KADDR 使用的虚拟<->物理地址映射偏移
+    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+
+    // 2. 读取设备树报告的物理内存布局
+    uint64_t mem_base = get_memory_base();
+    uint64_t mem_size = get_memory_size();
+    uint64_t mem_end = mem_base + mem_size;
+
+    if (mem_base == 0 || mem_size == 0) {
+        panic("page_init: invalid physical memory info from DTB");
+    }
+
+    // 物理页总数（从 0 到 mem_end 的页帧号）
+    npage = PPN(mem_end);
+
+    cprintf("memory: base=0x%016lx size=0x%016lx end=0x%016lx\n",
+            mem_base, mem_size, mem_end);
+    cprintf("npage: %lu\n", npage);
+
+    // 3. 将 Page 描述符数组放在内核镜像之后（按页对齐）
+    extern char end[];
+    pages = (struct Page *)ROUNDUP((uintptr_t)end, PGSIZE);
+
+    // 可管理的页数（位于或高于 DRAM_BASE 的页）
+    size_t nr_manage = npage - nbase;
+
+    // 4. 先将所有可管理页标记为保留；之后只有交给 init_memmap() 的
+    //    空闲区域才会被解除保留
+    for (size_t i = 0; i < nr_manage; i++) {
+        SetPageReserved(pages + i);
+    }
+
+    // 5. 计算空闲物理内存区域。
+    //    空闲区从 Page 描述符数组结束之后开始（按页对齐），
+    //    到 mem_end 之下的最后一个完整页结束。
+    uintptr_t pages_end_va = (uintptr_t)pages + nr_manage * sizeof(struct Page);
+    uintptr_t free_start_va = ROUNDUP(pages_end_va, PGSIZE);
+    uintptr_t free_start_pa = PADDR(free_start_va);
+    uintptr_t free_end_pa = ROUNDDOWN(mem_end, PGSIZE);
+
+    size_t nr_free = (free_end_pa - free_start_pa) / PGSIZE;
+
+    cprintf("free region: pa=0x%016lx - 0x%016lx (%lu pages)\n",
+            free_start_pa, free_end_pa, nr_free);
+
+    // 6. 将完整的空闲页范围交给 pmm 管理器。
+    //    当没有可用空闲页时不调用 init_memmap()。
+    if (nr_free > 0) {
+        init_memmap(pa2page(free_start_pa), nr_free);
+    }
+}
 
 /* pmm_init - initialize the physical memory management */
 void pmm_init(void) {
