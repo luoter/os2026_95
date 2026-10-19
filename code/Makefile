@@ -10,7 +10,7 @@ GCCPREFIX := riscv64-unknown-elf-
 #endif
 
 ifndef QEMU
-QEMU := /home/os/qemu-4.1.1/riscv64-softmmu/qemu-system-riscv64
+QEMU := /home/os/qemu-4.1.1/riscv64-softmmu/qemu-system-riscv64  # QEMU := qemu-system-riscv64 在自己电脑上运行时改一下路径
 endif
 
 ifndef SPIKE
@@ -165,7 +165,8 @@ qemu: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 		-machine virt \
 		-nographic \
 		-bios default \
-		-device loader,file=$(UCOREIMG),addr=0x80200000
+		-device loader,file=$(UCOREIMG),addr=0x80200000  
+		                                               #上一行运行时改成        -kernel $(UCOREIMG)
 
 debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \
