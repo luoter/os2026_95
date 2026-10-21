@@ -241,13 +241,15 @@ default_free_pages函数先检查待释放页面的状态，清除页面标志�
 
 **需要实现/修改的函数：**
 
+1. 
+
 ```
 static void best_fit_init(void);
 ```
 
 功能说明：初始化空闲块链表，将空闲页计数`nr_free`清零。
 
-**需要实现/修改的函数：**
+2. 
 
 ```
 static void best_fit_init_memmap(struct Page *base, size_t n);
@@ -255,15 +257,14 @@ static void best_fit_init_memmap(struct Page *base, size_t n);
 
 功能说明：初始化指定内存区域的页面状态和引用计数，设置空闲块首页及页数，并登记到空闲链表中。
 
-**需要实现/修改的函数：**
-
+3. 
 ```
 static void best_fit_insert_block(struct Page *base);
 ```
 
 功能说明：按物理地址升序插入空闲块，并合并物理地址相邻的前后空闲块。
 
-**需要实现/修改的函数：**
+4. 
 
 ```
 static struct Page *best_fit_alloc_pages(size_t n);
@@ -271,7 +272,7 @@ static struct Page *best_fit_alloc_pages(size_t n);
 
 功能说明：遍历空闲链表，选择满足请求的最小空闲块；大小相同时优先选择低地址块。分配后拆分剩余部分并更新页面状态和空闲页计数，无合适连续块时返回`NULL`。
 
-**需要实现/修改的函数：**
+5. 
 
 ```
 static void best_fit_free_pages(struct Page *base, size_t n);
@@ -279,7 +280,7 @@ static void best_fit_free_pages(struct Page *base, size_t n);
 
 功能说明：释放指定的连续页面，重置页面状态和引用计数，更新空闲页计数，并将释放区域插入空闲链表，与相邻空闲块合并。
 
-**需要实现/修改的函数：**
+6. 
 
 ```
 static size_t best_fit_nr_free_pages(void);
@@ -287,7 +288,7 @@ static size_t best_fit_nr_free_pages(void);
 
 功能说明：返回当前空闲物理页总数。
 
-**需要实现/修改的函数：**
+7. 
 
 ```
 static void init_pmm_manager(void);
@@ -295,7 +296,7 @@ static void init_pmm_manager(void);
 
 功能说明：将当前物理内存管理器切换为`best_fit_pmm_manager`，通过管理器接口调用 Best-Fit 的初始化、分配、释放和检查函数。
 
-**需要实现/修改的函数：**
+8. 
 
 ```
 static void page_init(void);
