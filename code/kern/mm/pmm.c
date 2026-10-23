@@ -71,7 +71,7 @@ size_t nr_free_pages(void) {
     return pmm_manager->nr_free_pages();
 }
 
-//lab2 function1 YOUR CODE
+//lab2 function1 2413330
 // page_init - 根据设备树探测物理内存并初始化 Page 描述符数组，
 // 然后将空闲页区域注册到当前的 pmm_manager。
 static void page_init(void) {
