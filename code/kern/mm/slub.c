@@ -1,10 +1,10 @@
+/* 2410691：Challenge SLUB 对象分配器 修改部分 开始 */
 #include <assert.h>
 #include <list.h>
 #include <mmu.h>
 #include <pmm.h>
 #include <slub.h>
 
-/**cs修改部分*/ /* 开始 */
 /* Single-hart teaching allocator; callers serialize operations.
  * Conceptual reference: Linux mm/slub.c (partial slabs and object freelists).
  * Independently implemented for ucore, not a port of Linux source. */
@@ -94,8 +94,6 @@ register_slab(struct slab *s, size_t count, unsigned int id) {
     list_add(&all_slabs, &s->all_link);
 }
 
-/**cs修改部分*/ /* 结束 */
-/**cs修改部分*/ /* 开始 */
 void *
 slub_alloc(size_t size) {
     assert(initialized);
@@ -160,8 +158,6 @@ slub_alloc(size_t size) {
     return obj;
 }
 
-/**cs修改部分*/ /* 结束 */
-/**cs修改部分*/ /* 开始 */
 void
 slub_free(void *ptr) {
     if (ptr == NULL) {
@@ -204,4 +200,4 @@ slub_free(void *ptr) {
         free_page(page);
     }
 }
-/**cs修改部分*/ /* 结束 */
+/* 2410691：Challenge SLUB 对象分配器 修改部分 结束 */

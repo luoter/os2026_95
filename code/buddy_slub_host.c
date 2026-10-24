@@ -1,3 +1,4 @@
+/* 2410691：Buddy 与 SLUB 联合测试 修改部分 开始 */
 /* Host-only smoke test for the two independent Lab2 allocators.
  * Build with tests/run_buddy_slub_host.sh. */
 #include <assert.h>
@@ -97,10 +98,9 @@ int main(void) {
     assert(nr_free_pages() == before);
     pmm_manager->check();
 
-   /**cs修改部分*/ /* 开始 */
     slub_init();
     slub_check();
     printf("Buddy and SLUB host checks passed (%lu free pages).\n", before);
-/**cs修改部分*/ /* 结束 */
     return 0;
 }
+/* 2410691：Buddy 与 SLUB 联合测试 修改部分 结束 */

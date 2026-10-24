@@ -1,4 +1,4 @@
-/**cs修改部分*/ /* 开始 */
+/* 2410691：Challenge SLUB 检查函数 修改部分 开始 */
 #include <assert.h>
 #include <mmu.h>
 #include <pmm.h>
@@ -70,4 +70,4 @@ slub_check(void) {
     slub_free(NULL);
     assert(nr_free_pages() == before);
 }
-/**cs修改部分*/ /* 结束 */
+/* 2410691：Challenge SLUB 检查函数 修改部分 结束 */

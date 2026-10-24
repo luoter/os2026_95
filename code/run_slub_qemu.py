@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# /**cs修改部分*/ 开始
+# 2410691：独立 QEMU 测试运行脚本 修改部分 开始
 """Build and boot an isolated RISC-V kernel without changing teammate modules."""
 from pathlib import Path
 import os
@@ -66,4 +66,4 @@ for backend in ["first-fit", "buddy"]:
         print(next(line for line in output.splitlines() if "PMM_QEMU_PASS" in line))
         print(next(line for line in output.splitlines() if "SLUB_QEMU_PASS" in line))
 print("Both isolated RISC-V SLUB kernels passed. Full lab kernel integration remains separate.")
-# /**cs修改部分*/ 结束
+# 2410691：独立 QEMU 测试运行脚本 修改部分 结束

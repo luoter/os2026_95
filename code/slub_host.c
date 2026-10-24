@@ -1,3 +1,4 @@
+/* 2410691：SLUB 宿主机测试 修改部分 开始 */
 #include <assert.h>
 #include <buddy_pmm.h>
 #include <default_pmm.h>
@@ -237,3 +238,4 @@ int main(int argc, char **argv) {
     }
     return 2; /* A negative case reaching here failed to reject the input. */
 }
+/* 2410691：SLUB 宿主机测试 修改部分 结束 */

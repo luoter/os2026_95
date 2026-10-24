@@ -10,8 +10,9 @@
 #include <string.h>
 #include <riscv.h>
 #include <dtb.h>
-/**cs修改部分*/
+/* 2410691 修改部分 开始：SLUB 头文件 */
 #include <slub.h>
+/* 2410691 修改部分 结束 */
 
 
 
@@ -38,13 +39,13 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    /*cs修改部分*/
+    /* lab2 function2-3 2410691 修改部分 开始：Buddy 管理器选择 */
     #ifdef PMM_USE_BUDDY
     pmm_manager = &buddy_pmm_manager;
     #else
     pmm_manager = &best_fit_pmm_manager;
     #endif
-    /*cs修改部分结束*/
+    /* lab2 function2-3 2410691 修改部分 结束 */
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -147,13 +148,13 @@ void pmm_init(void) {
     // use pmm->check to verify the correctness of the alloc/free function in a pmm
     check_alloc_page();
 
-     /* cs修改部分 开始：初始化 SLUB，可按编译开关运行自检 */
+     /* 2410691 修改部分 开始：初始化 SLUB，可按编译开关运行自检 */
     slub_init();
 #ifdef SLUB_SELFTEST
     slub_check();
     cprintf("slub_check() succeeded!\n");
 #endif
-    /* cs修改部分 结束 */
+    /* 2410691 修改部分 结束 */
 
     extern char boot_page_table_sv39[];
     satp_virtual = (pte_t*)boot_page_table_sv39;

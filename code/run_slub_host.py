@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 2410691：SLUB 测试运行脚本 修改部分 开始
 """Run positive cases and isolated assertion cases with two real PMMs and a mock."""
 from pathlib import Path
 import os
@@ -47,3 +48,4 @@ with tempfile.TemporaryDirectory(prefix="ucore-slub-") as tmp:
             if not ok:
                 raise SystemExit(text or line)
 print(f"All {len(lines)} SLUB cases passed with ASan/UBSan. Log: {logs / 'slub-host.log'}")
+# 2410691：SLUB 测试运行脚本 修改部分 结束

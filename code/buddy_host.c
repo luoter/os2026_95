@@ -1,3 +1,4 @@
+/* 2410691：Buddy 宿主机测试 修改部分 开始 */
 /* Independent tests of classic Buddy's public PMM behavior. */
 #include <assert.h>
 #include <buddy_pmm.h>
@@ -255,3 +256,4 @@ int main(int argc, char **argv) {
     }
     return 2;
 }
+/* 2410691：Buddy 宿主机测试 修改部分 结束 */
