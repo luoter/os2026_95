@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 2410691：Buddy 测试运行脚本 修改部分 开始
 from pathlib import Path
 import os
 import subprocess
@@ -34,3 +35,4 @@ with tempfile.TemporaryDirectory(prefix="ucore-buddy-") as tmp:
         if not ok:
             raise SystemExit(output or line)
 print("All 13 Buddy scenarios passed with ASan/UBSan.")
+# 2410691：Buddy 测试运行脚本 修改部分 结束

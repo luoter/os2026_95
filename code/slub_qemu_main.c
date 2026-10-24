@@ -1,3 +1,4 @@
+/* 2410691：独立 QEMU 测试入口 修改部分 开始 */
 /* Independent RISC-V test kernel. Reuses ucore entry/link/console/PMM code.
  * A reserved, static pool supplies real mapped pages; this does not implement
  * or replace the group's unfinished DTB/page_init assignment. */
@@ -74,3 +75,4 @@ int __noreturn kern_init(void) {
     cprintf("SLUB_QEMU_PASS backend=%s free=%lu\n", pmm_manager->name, nr_free_pages());
     stop();
 }
+/* 2410691：独立 QEMU 测试入口 修改部分 结束 */

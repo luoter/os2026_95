@@ -1,4 +1,4 @@
-/*cs修改：新增文件*/
+/* lab2 function2-3 2410691：Buddy System 分配器 修改部分 开始 */
 #include <buddy_pmm.h>
 #include <list.h>
 #include <pmm.h>
@@ -311,3 +311,4 @@ const struct pmm_manager buddy_pmm_manager = {
     .nr_free_pages = buddy_nr_free_pages,
     .check = buddy_check,
 };
+/* lab2 function2-3 2410691：Buddy System 分配器 修改部分 结束 */

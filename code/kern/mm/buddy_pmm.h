@@ -1,4 +1,4 @@
-/* cs修改部分 开始：新增 Buddy 管理器头文件 */
+/* lab2 function2-3 2410691：Buddy 管理器头文件 修改部分 开始 */
 
 #ifndef __KERN_MM_BUDDY_PMM_H__
 #define __KERN_MM_BUDDY_PMM_H__
@@ -20,4 +20,4 @@ extern const struct pmm_manager buddy_pmm_manager;
 
 #endif /* __KERN_MM_BUDDY_PMM_H__ */
 
-/* cs修改部分 结束 */
+/* lab2 function2-3 2410691：Buddy 管理器头文件 修改部分 结束 */
