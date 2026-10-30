@@ -61,10 +61,7 @@
 
 ## 四、实验内容与实现
 
-<!-- 
-说明：本部分按照 exercises 文档中的练习顺序组织
-每个功能模块或者练习中可能包含多项任务，请根据实际情况调整
--->
+
 
 ### 功能模块一：Trap 上下文恢复与 Trap 入口（`kern/trap/trapentry.S`）
 
@@ -371,14 +368,15 @@ void exception_handler(struct trapframe *tf);(kern\trap\trap.c)
 
 ## 五、测试与验证
 
-<!-- 根据该实验的具体情况，提供完整的测试运行截图，应包含：
-- 编译及运行成功的输出（make qemu），可能有多个
-- 测试通过的结果（make grade），只有一个
--->
 
-**测试截图：**
 
-![测试结果截图](./images/test_result.png)
+**make qemu测试截图：**
+
+![测试结果截图](./images/make_qemu.png)
+
+**make grade测试截图：**
+
+![测试结果截图](./images/make_grade.png)
 
 ---
 
