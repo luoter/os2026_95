@@ -56,7 +56,7 @@
 
     .macro RESTORE_ALL
 
-    #lab3 function1 2413330
+    #lab3 function1 2410691
     # Restore the CSRs before restoring the scratch registers.
     LOAD t0, 32*REGBYTES(sp)
     LOAD t1, 33*REGBYTES(sp)
@@ -105,7 +105,7 @@
 __alltraps:
     SAVE_ALL
 
-    #lab3 function1 2413330
+    #lab3 function1 2410691
     mv a0, sp
     jal trap
     # sp is the trap frame base again after trap returns.

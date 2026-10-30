@@ -72,7 +72,7 @@
 修改位置：只修改 kern/trap/trapentry.S 中两处标有
 “#lab3 function1 YOUR CODE”的位置，分别补全 RESTORE_ALL 宏和
 __alltraps 入口。保留 lab3 function1 注释，将 YOUR CODE 改为负责人
-学号 2413330。不要修改其他文件或无关代码。
+学号 2410691。不要修改其他文件或无关代码。
 
 [RELY]
 
@@ -161,7 +161,7 @@ Trap 发生后，`__alltraps` 保存现场，并把 Trap frame 交给 C 语言�
 只修改 kern/trap/trapentry.S 中 __alltraps 下方标有
 “#lab3 function1 YOUR CODE”的位置。先阅读该文件和 kern/trap/trap.h，
 依据现有代码完成传参和调用，不修改其他位置。保留 lab3 function1
-注释，并将 YOUR CODE 改为负责人学号 2413330。
+注释，并将 YOUR CODE 改为负责人学号 2410691。
 
 [RELY]
 可以依赖以下已有内容：
