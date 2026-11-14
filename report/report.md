@@ -145,80 +145,66 @@ int another_function(int arg);
 [按照和第一次迭代相同的格式]
 
 ---
-### 功能模块二：[模块名称]
+### 功能模块二：[进程创建及初始化功能]
 
-**负责人：** [学号-姓名]
+**负责人：** [2413330-张子馨]
 
 #### 模块功能描述
 
 **需要实现/修改的函数：**
 
 ```c
-// 列出本模块涉及的所有函数签名
-void example_function(void);
-int another_function(int arg);
+static struct proc_struct *alloc_proc(void);
+void proc_init(void);
+int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags);
+int do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf);
+static void copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf);
+static int copy_mm(uint32_t clone_flags, struct proc_struct *proc);
 ```
 
 **功能说明：**
 
-[简要描述该模块的功能，包括：
-- 该模块在整个系统中的作用
-- 需要处理的主要场景
-- 与其他模块的交互关系]
+本模块负责把系统从能运行内核代码推进到能创建并登记多个内核线程，是连接地址空间与调度的中间层。
+
+- 在系统中的作用：alloc_proc 提供干净的进程控制块；proc_init 初始化进程链表与哈希表，把当前执行现场包装成 idleproc，并创建第一个内核线程 initproc；kernel_thread 把函数入口和参数整理成首次运行上下文；do_fork 把控制块、内核栈、PID、链表和状态组合成可运行实体；copy_thread 在新线程内核栈上安放 trapframe 和 context，形成 forkret 到 forkrets 到 __trapret 的首次运行链路；copy_mm 在本阶段承担地址空间处理接口的占位作用。
+- 主要场景：idleproc 不经过 fork，直接复用 bootstack 和当前执行现场；initproc 由 do_fork 创建，PID 为 1，parent 为 idleproc。
+- 与其他模块的交互：依赖模块一的页操作和物理页分配来建立内核栈，向模块三提供状态为 PROC_RUNNABLE 的线程对象，由 schedule、proc_run 和 switch_to 接管执行。
 
 #### 最终提示词
 
-以下是经过迭代优化后，最终成功实现该功能的提示词：
+以下是最终成功实现该功能的提示词：
 
 ````markdown
 
-[按照提示词模板，给出具体的提示词]
+请在 kern/process/proc.c 的 LAB4 function2 标记处实现进程创建及初始化功能，包括 alloc_proc、proc_init、kernel_thread、do_fork、copy_thread、copy_mm。
+
+功能要求：
+- alloc_proc：用 kmalloc 分配 PCB 并初始化为安全空白状态，state 为 PROC_UNINIT，context 清零，tf 为 NULL，pgdir 为 boot_pgdir_pa。
+- proc_init：初始化 proc_list 和 hash_list；idleproc 直接复用当前执行现场，PID 为 0，kstack 为 bootstack，state 为 PROC_RUNNABLE，current 指向 idleproc；随后用 kernel_thread 创建 init_main 线程作为 initproc，PID 为 1。
+- kernel_thread：把 fn 和 arg 分别放入 tf.gpr.s0 和 tf.gpr.s1，status 设置 SSTATUS_SPP 和 SSTATUS_SPIE 并清除 SSTATUS_SIE，epc 指向 kernel_thread_entry，再调用 do_fork。
+- do_fork：依次完成 alloc_proc、设置 parent 为 current、setup_kstack、copy_mm、copy_thread，在 local_intr_save 和 local_intr_restore 保护的临界区内分配 PID 并挂入 proc_list 和 hash_list，最后 wakeup_proc，失败时按相反顺序释放资源。
+- copy_thread：在新线程内核栈顶安放 trapframe，context.ra 设为 forkret，context.sp 指向 trapframe，形成 forkret 到 forkrets 到 __trapret 的首次运行链路。
+- copy_mm：本阶段不复制地址空间，直接返回 0。
+
+注意事项：
+- 保持线程生命周期状态与资源挂接顺序一致，避免资源泄漏和状态错误。
+- idleproc 不经过 do_fork，其 tf、flags、context.ra 必须保持为 0。
+- kernel_thread 与 copy_thread 必须和 entry.S 中 kernel_thread_entry 使用 s0 作为函数入口、s1 作为参数的约定一致。
+- 测试要求 initproc 的 parent 为 idleproc，context.ra 和 context.sp 非零。
+
+可借助接口：kmalloc、kfree、alloc_pages、free_pages、page2kva、kva2page、get_pid、find_proc、set_proc_name、wakeup_proc、list_init、list_add、local_intr_save、local_intr_restore、read_csr、bootstack、boot_pgdir_pa、CLONE_VM。
 
 ````
 
 #### 实现迭代过程
 
-本模块的实现经历了 [N] 次迭代，过程如下：
-
----
-
-##### 第一次迭代
-
-如果设计的prompt生成代码后出现问题：
-
-**遇到的问题：**
-- 问题1：问题描述、错误信息和原因分析
-- 问题2：问题描述、错误信息和原因分析
-
-**问题解决策略：**
-- 针对问题1：[说明如何修改提示词]
-- 针对问题2：[说明如何修改提示词]
-
-如果没有问题：
+本模块一次实现成功，未经历提示词迭代。
 
 **最终结果：**
 
-经过 [N] 次迭代，该模块最终：
-- ✅ 编译通过
-- ✅ 所有相关测试通过
-- ✅ 功能符合预期
-
-**关键改进点总结（如有）：**
-1. [改进点1：例如，在 [RELY] 中补充了完整的系统调用号定义]
-2. [改进点2：例如，在 [SPECIFICATION] 中明确了异常处理的边界条件]
-3. [改进点3：例如，增加了对用户指针合法性检查的要求]
-
----
-
-##### 第二次迭代（如有）
-
-[按照和第一次迭代相同的格式]
-
----
-
-##### 第三次迭代（如有）
-
-[按照和第一次迭代相同的格式]
+- 编译通过，未出现警告或错误。
+- 实现满足 test_lab4_process_create 中的全部字段断言，包括 idleproc 的 PID、内核栈、父进程、状态以及 initproc 的 PID、parent 和首次运行上下文。
+- 完整 qemu 运行测试需在功能模块一和功能模块三完成后统一进行。
 
 ---
 
