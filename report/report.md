@@ -79,17 +79,29 @@
 **需要实现/修改的函数：**
 
 ```c
-// 列出本模块涉及的所有函数签名
-void example_function(void);
-int another_function(int arg);
+// kern/trap/trap.c
+void exception_handler(struct trapframe *tf);
+
+// kern/syscall/syscall.c
+void syscall(void);
+static int sys_exit(uint64_t arg[]);
+static int sys_fork(uint64_t arg[]);
+static int sys_wait(uint64_t arg[]);
+static int sys_exec(uint64_t arg[]);
+static int sys_yield(uint64_t arg[]);
+static int sys_kill(uint64_t arg[]);
+static int sys_getpid(uint64_t arg[]);
+static int sys_putc(uint64_t arg[]);
+static int sys_pgdir(uint64_t arg[]);
 ```
 
 **功能说明：**
 
-[简要描述该模块的功能，包括：
-- 该模块在整个系统中的作用
-- 需要处理的主要场景
-- 与其他模块的交互关系]
+本模块负责把用户态通过 `ecall` 发起的请求接入内核，并把处理结果写回用户可见的寄存器，是用户程序获得内核服务的第一道入口。
+
+- 在系统中的作用：`exception_handler` 只额外关注 `CAUSE_USER_ECALL`，识别后调用 `syscall` 并把 `epc` 前移 4 字节，避免返回后重复执行同一条 `ecall`；`syscall` 按 `a0` 中的系统调用号查表分发，`a1~a5` 组成参数数组；各 `sys_*` 再把统一编号翻译成具体内核语义，最终调用 `do_exit`、`do_fork`、`do_wait`、`do_execve`、`do_yield`、`do_kill` 或直接读写内核资源。
+- 主要场景：`sys_getpid`、`sys_putc` 直接返回或在控制台输出；`sys_fork` 以当前 `trapframe` 和用户栈指针复制子进程；`sys_wait` 与 `sys_exec` 需要先用 `user_mem_check` 检查用户指针；编号越界或对应表项为空时按 `-E_INVAL` 处理。
+- 与其他模块的交互：向下依赖模块二至四提供的 `do_*` 进程管理函数；向上与 `user/libs/syscall.c` 的封装约定保持一致（`a0` 放编号，`a1~a5` 放参数，返回值写回 `a0`）；`current->tf` 是取参与写回结果的唯一来源。
 
 #### 最终提示词
 
@@ -97,41 +109,55 @@ int another_function(int arg);
 
 ````markdown
 
-[按照提示词模板，给出具体的提示词]
+请完成 Lab 5 功能模块一：用户态系统调用功能。只修改 `kern/trap/trap.c` 和 `kern/syscall/syscall.c` 中标有 `lab5 function1` 的位置，保留原有注释，不要实现其他功能模块。
+
+[RELY]
+- `struct trapframe` 见 `kern/trap/trap.h`：`gpr.a0` 为系统调用号，`gpr.a1~a5` 为参数，`epc` 为陷入地址，`cause` 为异常原因。
+- 用户态封装见 `user/libs/syscall.c`：先 `ld a0, num`，再 `ld a1~a5` 放参数，`ecall` 后从 `a0` 取返回值。
+- 内核语义入口为 `do_exit`、`do_fork`、`do_wait`、`do_execve`、`do_yield`、`do_kill`，声明在 `kern/process/proc.h`。
+- 用户指针检查用 `user_mem_check(mm, addr, len, write)`，声明在 `kern/mm/vmm.h`；字符输出用 `cputchar`。
+
+[SPECIFICATION]
+1. `exception_handler` 增加 `CAUSE_USER_ECALL` 分支：调用 `syscall()`，然后执行 `tf->epc += 4`。
+2. `syscall` 从 `current->tf` 读取编号与参数；编号必须满足 `0 < num < NUM_SYSCALLS` 且 `syscalls[num] != NULL`，否则向 `a0` 写入 `-E_INVAL` 并打印提示。
+3. 合法调用时把返回值写回 `tf->gpr.a0`。
+4. `sys_fork` 传 `do_fork(0, tf->gpr.sp, current->tf)`；`sys_wait` 的 `code_store` 非空时必须按可写检查；`sys_exec` 的 `name` 与 `binary` 必须按只读检查，失败返回 `-E_INVAL`。
+5. `sys_putc` 返回 0，`sys_getpid` 返回 `current->pid`；`sys_pgdir` 在框架未提供 `print_pgdir` 实现时直接返回 0。
+
+[CONSTRAINT]
+- `syscalls[]` 数组位于函数定义之前，必须在数组前补 `static` 前向声明，并包含 `<vmm.h>`、`<error.h>`。
+- 不修改系统调用号和参数顺序；不信任任何用户指针；保留 `lab5 function1` 注释。
 
 ````
 
 #### 实现迭代过程
 
-本模块的实现经历了 [N] 次迭代，过程如下：
+本模块的实现经历了 2 次迭代，过程如下：
 
 ---
 
 ##### 第一次迭代
 
-如果设计的prompt生成代码后出现问题：
-
 **遇到的问题：**
-- 问题1：问题描述、错误信息和原因分析
-- 问题2：问题描述、错误信息和原因分析
+- 问题1：`syscalls[]` 数组在函数定义之前引用 `sys_exit` 等符号，编译报 `undeclared here (not in a function)`。
+- 问题2：`sys_wait`/`sys_exec` 中的 `user_mem_check` 与 `E_INVAL` 未声明，编译报隐式声明和未定义错误。
 
 **问题解决策略：**
-- 针对问题1：[说明如何修改提示词]
-- 针对问题2：[说明如何修改提示词]
-
-如果没有问题：
+- 针对问题1：在数组前补充 `static` 函数原型，保持原有 `lab5 function1` 注释位置不变。
+- 针对问题2：补充 `<vmm.h>` 和 `<error.h>`，并在提示词的 `[RELY]` 中列出可借助接口的声明位置。
 
 **最终结果：**
 
-经过 [N] 次迭代，该模块最终：
-- ✅ 编译通过
-- ✅ 所有相关测试通过
-- ✅ 功能符合预期
+经过 2 次迭代，该模块最终：
+- ✅ `trap.c` 与 `syscall.c` 编译通过
+- ⏳ 完整内核链接与 qemu 运行需在模块二至四补齐 `do_fork`、`do_wait`、`do_execve`、`do_exit`、`do_yield`、`do_kill`、`proc_init` 后统一验证
+- ✅ `test_lab5_syscall` 关注的 `epc += 4`、`getpid` 返回值写回、非法编号返回 `-E_INVAL` 均已按约定实现
 
-**关键改进点总结（如有）：**
-1. [改进点1：例如，在 [RELY] 中补充了完整的系统调用号定义]
-2. [改进点2：例如，在 [SPECIFICATION] 中明确了异常处理的边界条件]
-3. [改进点3：例如，增加了对用户指针合法性检查的要求]
+**关键改进点总结：**
+1. 在 `[SPECIFICATION]` 中明确 `a0` 为编号、`a1~a5` 为参数、返回值写回 `a0` 的约定。
+2. 明确 `ecall` 长度固定为 4 字节，必须前移 `epc`。
+3. 明确所有用户指针先经 `user_mem_check` 检查，非法编号统一返回 `-E_INVAL`。
+
 
 ---
 

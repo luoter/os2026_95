@@ -176,6 +176,12 @@ void exception_handler(struct trapframe *tf)
         /* ebreak 可能是 16 位压缩指令，需按实际长度更新 epc */
         tf->epc += instr_length(tf->epc);
         break;
+    case CAUSE_USER_ECALL:
+        /* 用户态发起系统调用：交给 syscall 统一分发 */
+        syscall();
+        /* ecall 固定为 4 字节，前移 epc 以免返回后重复执行同一条指令 */
+        tf->epc += 4;
+        break;
     default:
         /* 本实验不要求恢复的异常：直接打印 Trap frame 兜底 */
         print_trapframe(tf);
