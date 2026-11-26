@@ -33,7 +33,7 @@ static int (*syscalls[])(uint64_t arg[]) = {
 
 #define NUM_SYSCALLS        ((sizeof(syscalls)) / (sizeof(syscalls[0])))
 
-//lab5 function1 YOUR CODE
+//lab5 function1 2413330
 
 // sys_exit - 结束当前进程，error_code 由父进程通过 wait 取回
 static int

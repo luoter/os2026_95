@@ -162,6 +162,7 @@ void interrupt_handler(struct trapframe *tf)
     }
 }
 
+//lab5 function1 2413330 update exception_handler
 void exception_handler(struct trapframe *tf)
 {
     switch (tf->cause)
@@ -188,9 +189,6 @@ void exception_handler(struct trapframe *tf)
         break;
     }
 }
-
-
-//lab5 function1 YOUR CODE update exception_handler
 
 
 static inline void trap_dispatch(struct trapframe *tf)
