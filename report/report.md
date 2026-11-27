@@ -182,17 +182,24 @@ static int sys_pgdir(uint64_t arg[]);
 **需要实现/修改的函数：**
 
 ```c
-// 列出本模块涉及的所有函数签名
-void example_function(void);
-int another_function(int arg);
+static int init_main(void *arg);
+static struct proc_struct *alloc_proc(void);
+int kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags);
+int do_wait(int pid, int *code_store);
+static int user_main(void *arg);
+static int kernel_execve(const char *name, unsigned char *binary, size_t size);
+int do_execve(const char *name, size_t len, unsigned char *binary, size_t size);
+static int load_icode(unsigned char *binary, size_t size);
+void proc_init(void);
+static void copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf);
 ```
 
 **功能说明：**
 
-[简要描述该模块的功能，包括：
-- 该模块在整个系统中的作用
-- 需要处理的主要场景
-- 与其他模块的交互关系]
+系统作用：建立从内核线程到第一个用户进程的启动流程，完成ELF装载、用户地址空间和执行上下文初始化，并通过异常返回进入用户态。
+主要场景：处理启动程序选择、地址空间替换、代码与数据段装载、BSS清零、用户栈建立，以及父进程等待和回收退出的子进程；同时检查非法参数并清理装载失败时分配的资源。
+模块交互：依赖进程创建与调度模块建立、运行线程；调用内存管理接口建立页表和用户映射；复用`forkrets → __trapret → sret`完成特权级切换；通过`do_wait`与退出模块的僵尸状态和父进程唤醒机制配合完成回收。
+
 
 #### 最终提示词
 
@@ -200,55 +207,277 @@ int another_function(int arg);
 
 ````markdown
 
-[按照提示词模板，给出具体的提示词]
+[PROMPT]
+
+你正在VS Code终端agent环境中协助我完成RISC-V64 ucore Lab5。
+
+实验指导书已经提供。当前工作区是实验代码，功能模块一已经实现。本次任务是按照指导书完成功能模块二：“创建加载第一个用户进程功能”。
+
+请先阅读指导书中功能模块二、“用户进程管理”和“第一次进入用户态”的相关内容，再检查当前代码，然后直接进行修改，不要只给出示例代码或实现建议。
+
+目标调用链为：
+proc_init
+→ kernel_thread(init_main)
+→ init_main
+→ kernel_thread(user_main)
+→ user_main
+→ kernel_execve
+→ do_execve
+→ load_icode
+→ __trapret
+→ sret
+→ 用户程序入口。
+
+父进程通过do_wait等待并回收退出的子进程。
+
+修改以kern/process/proc.c 为主，保留功能模块一的已有实现、函数接口、实验标记和项目风格。不要重复定义已有函数，不要直接套用其他版本ucore的代码。
+
+本次不实现功能模块三、四、COW或双重GDB分支任务，也不自动提交或推送仓库。
+
+开始修改前，检查模块二的前置依赖：
+1. 区分真正已有实现、仅有函数声明和留空占位的函数。
+2. 对proc_init、copy_thread等缺失的Lab4基础功能，允许补齐本模块必需的最小实现，并在最终说明中单独列出。
+3. 对do_fork、copy_mm等模块三函数，以及do_exit等模块四函数，如尚未实现，应明确记录为跨模块依赖，不要擅自完成，也不要用空函数、固定成功返回值或注释掉调用的方式绕过。
+4. 即使完整运行被其他模块阻塞，也应先完成本次模块二中能够独立完成的实现和检查，再准确报告剩余阻塞。
+
+
+[RELY]
+
+所有接口、字段、宏和调用约定以当前工作区的实际代码为准。指导书用于确定实验目标；其中旧版本代码、说明性示例不能替代当前仓库的接口定义。
+
+重点阅读：
+
+1. 进程及调度
+- kern/process/proc.c
+- kern/process/proc.h
+- kern/process/entry.S
+- kern/process/switch.S
+- kern/schedule/sched.c
+- kern/sync/sync.h
+
+可使用current、idleproc、initproc、proc_list、hash_list，
+以及 setup_kstack、put_kstack、setup_pgdir、put_pgdir、
+get_pid、hash_proc、unhash_proc、set_links、remove_links、
+set_proc_name、find_proc、wakeup_proc、schedule等已有辅助接口。
+
+2. 虚拟内存
+- kern/mm/vmm.c、vmm.h
+- kern/mm/pmm.c、pmm.h
+- kern/mm/memlayout.h、mmu.h
+
+可使用mm_create、mm_map、exit_mmap、mm_destroy、
+mm_count_inc、mm_count_dec、pgdir_alloc_page、
+page2kva、PADDR、user_mem_check等实际存在的接口。
+
+注意区分：
+- mm->pgdir所使用的内核虚拟地址；
+- proc->pgdir所保存的页表物理地址；
+- satp 所需的页表页号和模式位。
+
+3. ELF与异常返回
+- libs/elf.h
+- libs/riscv.h
+- kern/trap/trap.h
+- kern/trap/trapentry.S
+
+使用仓库定义的elfhdr、proghdr、trapframe、
+ELF_PT_LOAD、ELF_PF_R/W/X、
+SSTATUS_SPP、SSTATUS_SPIE、SSTATUS_SIE、
+PTE_U、PTE_R/W/X/V等。
+
+异常返回已有__trapret、forkrets等入口，应检查其真实行为后复用。
+内核线程入口kernel_thread_entry使用哪些寄存器传递fn和arg，
+必须以当前entry.S为准。
+
+4. 用户程序及构建
+- user/hello.c、user/exit.c、user/testbss.c
+- user/libs/initcode.S、ulib.c、syscall.c
+- Makefile
+- tools/user.ld
+- tools/test_lab5.c、inject.py、grade.sh
+
+复用现有KERNEL_EXECVE、KERNEL_EXECVE2宏和用户程序二进制符号。
+保留Makefile中TEST、TESTSTART、TESTSIZE的测试程序选择机制。
+
+注意：wait()的用户库封装传入 pid=0。
+不能根据现有注释中“pid=-1 表示任意子进程”的说法，
+擅自改成Linux的waitpid约定。
+
+
+[GUARANTEE]
+
+按指导书实现或完善kern/process/proc.c中以下8个函数，保持签名：
+
+1. static int init_main(void *arg)
+2. static struct proc_struct *alloc_proc(void)
+3. int kernel_thread(int (*fn)(void *), void *arg,
+                     uint32_t clone_flags)
+4. int do_wait(int pid, int *code_store)
+5. static int user_main(void *arg)
+6. static int kernel_execve(const char *name,
+                            unsigned char *binary, size_t size)
+7. int do_execve(const char *name, size_t len,
+                 unsigned char *binary, size_t size)
+8. static int load_icode(unsigned char *binary, size_t size)
+
+必要时增加局部辅助函数和前置声明。
+
+保留lab5 function2等实验注释。学号标注沿用项目中已经填写的学号；
+如果无法确定，应保留待填写标记，不要编造。
+
+完成后交付：
+- 实际代码修改；
+- 修改文件和函数清单；
+- 启动、装载、进入用户态和等待回收的调用链说明；
+- 实际执行的检查命令及结果；
+- 尚未完成的跨模块依赖和环境限制。
+
+不能把“代码已填写”“编译通过”“用户态运行通过”
+和“整个 Lab5 通过”混为一谈。
+
+
+[SPECIFICATION]
+
+1. alloc_proc
+
+- 分配失败返回NULL。
+- 保留Lab4已有字段的正确初始化。
+- 初始化Lab5新增的exit_code、wait_state、cptr、yptr、optr。
+- 初始化需要初始化的链表节点，避免未初始化字段进入进程管理逻辑。
+- 新进程应处于PROC_UNINIT，尚未分配有效PID、用户地址空间或内核栈。
+- 页表字段沿用当前工程的启动页表表示方式。
+
+2. kernel_thread
+
+- 构造并清零临时trapframe。
+- 按 kernel_thread_entry 的寄存器约定设置fn和arg。
+- 设置内核线程入口地址和适合返回S模式的状态位。
+- 正确设置SPP、SPIE和SIE，不能使新内核线程误入U模式。
+- 通过do_fork 创建线程，保留传入clone_flags，并按工程约定添加CLONE_VM。
+- 返回创建结果，不吞掉错误。
+
+3. init_main
+
+- 通过kernel_thread创建执行user_main的子线程，检查创建结果。
+- 循环调用do_wait(0, NULL)，等待并回收所有子进程，包括后续交由initproc收养的子进程。
+- 不应把一次被唤醒或一次等待返回当成全部子进程结束。
+- 子进程全部回收后，按照项目测试要求输出结束信息并检查进程、链表及内存状态。
+- 若进行空闲页数量检查，应选择一致的统计时点，并考虑当前工程实际存在的持久分配。
+- initproc不应通过正常返回意外进入do_exit。
+
+4. user_main
+
+- 存在TEST等测试宏时，通过KERNEL_EXECVE2选择对应二进制。
+- 普通构建可默认选择hello，便于首先验证基础装载和用户态输出。
+- 不要把某个用户程序硬编码到所有构建路径。
+- exec成功后不应继续执行原来的内核线程业务；失败路径应明确处理或报告错误。
+
+5. kernel_execve
+
+- 内核线程已经运行于S模式，不能照搬用户态ecall包装来发起首次exec。
+- 调用do_execve完成程序映像准备后，必须真正接入异常返回路径。
+- 成功路径应使sp指向有效的目标trapframe，再转入__trapret，或使用当前工程等价的forkrets入口，最终执行sret。
+- 成功后不应作为普通C函数返回user_main。
+- trapframe的准备位置及切换过程必须安全：不能覆盖当前仍在使用的C调用栈帧、返回地址或局部变量。
+- 处理好current->tf、内核栈和失败返回路径的关系。
+- 如使用内联汇编，应正确声明约束、寄存器和memory clobber，不能依赖优化器偶然生成正确代码。
+- 优先复用现有返回入口，不额外修改模块一的异常分发逻辑。
+
+6. do_execve
+
+- 正确处理程序名及长度；设置进程名前先保存为有界且以零结尾的内核缓冲区，不能假设用户字符串已经终止。
+- 区分内核启动路径中的可信内核指针与用户态传入的指针；用户指针须按当前工程接口进行检查。
+- 在释放旧mm前，保证后续仍要读取的name和binary数据仍然有效。
+- 特别注意：仅通过user_mem_check，并不能保证释放旧mm后binary仍可访问。
+- 对来自旧用户地址空间的ELF数据，应在销毁旧映像前安全保存，或采用等价且明确说明的有效生命周期方案。
+- 当前进程有旧mm时，先切换到安全的内核页表，再按引用计数释放旧地址空间。
+- 仅在旧mm引用计数归零时销毁它，并正确更新current->mm 和 current->pgdir。
+- 调用load_icode装载新映像，成功后更新进程名。
+- 明确处理装载失败：
+  旧映像仍有效时可以返回错误；
+  旧映像已销毁时不得返回原用户程序继续执行，应按项目约定进入失败退出路径。
+- 释放错误路径中的临时缓冲区，避免泄漏和重复释放。
+- 如失败退出依赖未完成的模块四，应如实标注依赖，不能以无限循环或伪造成功替代。
+
+7. load_icode
+
+- 建立新mm和页表，保留必要的内核映射。
+- 检查ELF魔数、头部和程序头表是否位于binary的size范围内。
+- 使用仓库实际定义的ELF字段。
+- 检查p_filesz <= p_memsz，以及文件偏移、段地址和长度计算是否越界或溢出。
+- 只装载ELF_PT_LOAD段；正确处理空段、非页对齐边界和跨页复制。
+- 根据ELF段属性建立VMA，并设置合法的RISC-V用户页权限；不能把所有段统一设成可写可执行。
+- 正确分配页面、复制文件内容，并清零BSS，即p_memsz超出p_filesz的部分。
+- 避免重复清零或重复映射导致同页已有段内容被破坏。
+- 在[USTACKTOP-USTACKSIZE, USTACKTOP)建立用户栈VMA，按工程约定提供可用的栈页并保留栈保护语义。
+- 栈指针使用工程定义的USTACKTOP，并满足ABI对齐要求。
+- 正确关联mm、页表和当前进程，设置引用计数、satp，并执行必要的TLB和指令缓存同步。
+- 清零并设置目标trapframe：
+  epc = ELF 入口；
+  gpr.sp = 用户栈顶；
+  SPP清零，返回 U 模式；
+  SPIE按约定置位；
+  SIE在恢复过程中保持关闭。
+- 失败时回收已经建立的用户映射、页表、VMA和mm，避免泄漏或留下部分提交的进程状态。
+
+8. do_wait
+
+- pid=0：等待任意一个直接子进程。
+- pid>0：仅等待指定的直接子进程，不能回收无亲子关系的进程。
+- 其他pid按当前工程约定返回错误；无匹配子进程时返回-E_BAD_PROC。
+- code_store非NULL时，检查目标地址可写，不能直接信任用户指针。
+- 找到僵尸子进程后，保存退出码，从PID哈希表和进程关系中摘除，再释放其内核栈和PCB。
+- 只能回收一次，不能在kfree后继续访问该进程。
+- 有匹配子进程但尚未退出时，将当前进程设置为PROC_SLEEPING、WT_CHILD，再调用schedule。
+- 扫描子进程、设置等待状态和回收操作应正确配合临界区，避免丢失唤醒。
+- 被唤醒后重新检查条件。
+- 正确处理PF_EXITING等待中断情形，并与do_exit的父进程唤醒约定一致。
+
+9. 异常返回衔接
+
+- 检查已有SAVE_ALL、RESTORE_ALL是否满足：
+  内核运行时sscratch=0；
+  返回用户态前sscratch保存有效内核栈顶；
+  用户态陷入时能够切换到内核栈。
+- 首次用户态启动与后续用户态系统调用都应使用一致的 trapframe 布局。
+- 已有实现正确时直接复用；确有问题时才做最小修复，并说明原因。
+
+10. 验证
+
+- 先确认实际构建目录、工具链、QEMU和构建目标。
+- 执行可用的编译和静态检查。
+- 依赖齐全时，优先使用hello验证：
+  用户程序入口可达；
+  确实运行于 U 模式；
+  用户态系统调用输出可以返回并继续执行。
+- 再使用 testbss 检查数据段与 BSS；相关依赖完成后使用exit验证等待和回收。
+- 完整make grade包含模块三、四以及其他异常处理的测试。依赖未完成时，不能把完整评分通过作为本次已达成的结果。
+- 不修改评分脚本、删除断言或伪造 PASS 输出来获得通过。
+- 若因环境或跨模块缺失无法运行，列出具体命令、错误和阻塞函数，明确哪些行为只完成了代码检查、尚未运行验证。
+
+最后用中文说明实现结果，重点解释：
+为什么kernel_execve 不能只调用do_execve，
+以及用户栈、内核栈、trapframe、sscratch和sret
+如何共同完成第一次进入用户态。
+
 
 ````
 
 #### 实现迭代过程
 
-本模块的实现经历了 [N] 次迭代，过程如下：
-
----
-
-##### 第一次迭代
-
-如果设计的prompt生成代码后出现问题：
-
-**遇到的问题：**
-- 问题1：问题描述、错误信息和原因分析
-- 问题2：问题描述、错误信息和原因分析
-
-**问题解决策略：**
-- 针对问题1：[说明如何修改提示词]
-- 针对问题2：[说明如何修改提示词]
-
-如果没有问题：
+本模块的实现经历了 [0] 次迭代。
 
 **最终结果：**
 
-经过 [N] 次迭代，该模块最终：
+经过 [0] 次迭代，该模块最终：
 - ✅ 编译通过
 - ✅ 所有相关测试通过
 - ✅ 功能符合预期
 
-**关键改进点总结（如有）：**
-1. [改进点1：例如，在 [RELY] 中补充了完整的系统调用号定义]
-2. [改进点2：例如，在 [SPECIFICATION] 中明确了异常处理的边界条件]
-3. [改进点3：例如，增加了对用户指针合法性检查的要求]
 
 ---
 
-##### 第二次迭代（如有）
 
-[按照和第一次迭代相同的格式]
-
----
-
-##### 第三次迭代（如有）
-
-[按照和第一次迭代相同的格式]
-
----
 
 ### 功能模块三：复制用户进程功能
 
